@@ -30,6 +30,8 @@ class O_PathPlan(object):
 
     def __init__(self, dt):
 
+        print("ORCA!!")
+
         self.dt = dt
         self.change_time = rospy.Time.now()
         self.agents_num, self.max_agents_num = 0, 9
@@ -65,6 +67,7 @@ class O_PathPlan(object):
 
     def publish_msg(self):
         self.pathplan_pub.publish(self.pathplan_pub_msg_nxt)
+        # print("pub")
 
     def iteration(self, event):
         if (self.start_sim and rospy.Time.now()-self.change_time > rospy.Duration(secs=5)):
@@ -83,6 +86,7 @@ class O_PathPlan(object):
                     self.update_params(j)
                     self.sim.setAgentPosition(j, (self.cur_pos[i*3], self.cur_pos[i*3+1], self.cur_pos[i*3+2]))
                     vel = self.des_pos[i*3:i*3+3] - self.cur_pos[i*3:i*3+3]
+                    # print(i, self.des_pos[i*3:i*3+3])
                     nor = np.linalg.norm(vel)
                     if nor < 10**-4:
                         prefV[0], prefV[1], prefV[2] = 0.0, 0.0, 0.0
@@ -96,7 +100,6 @@ class O_PathPlan(object):
             self.update_nxtpos()
             self.publish_msg()
 
-
     
     def pathplan_callback(self, msg):
         self.pathplan_pub_msg = msg
@@ -105,10 +108,10 @@ class O_PathPlan(object):
         self.uavs_id = msg.uavs_id
         self.cur_pos = np.asarray(msg.cur_position)
         self.des_pos = np.asarray(msg.des_position)
-        self.timeHorizon = msg.params[0]
-        self.MaxVelo = msg.params[1]
-        self.radius = msg.params[2]
-        self.neighborDist = msg.params[3]
+        if (msg.params[0]!= 0.0): self.timeHorizon = msg.params[0]
+        if (msg.params[1]!= 0.0): self.MaxVelo = msg.params[1]
+        if (msg.params[2]!= 0.0): self.radius = msg.params[2]
+        if (msg.params[3]!= 0.0): self.neighborDist = msg.params[3]
     
     def update_params(self, j):
         if (self.sim.getAgentTimeHorizon(j) != self.timeHorizon):

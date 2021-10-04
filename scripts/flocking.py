@@ -42,12 +42,13 @@ def repulsive_force(host, agents, RG, ra, rx_mat, ry_mat, height_mat):
                 continue
             else:
                 h_alpha = height_mat[host.id][neighbor.id]
+                print(h_alpha)
             ForceComponent_xy = -RG*bump_fn(distxy/r_alpha) * np.square(distxy-r_alpha)
             ForceComponent_z = -RG*bump_fn(abs(dist_v[2])/h_alpha) * np.square(abs(dist_v[2])-h_alpha)
 
             f[:2] += ForceComponent_xy*dist_v[:2]/dist
             f[2] += ForceComponent_z*dist_v[2]/dist
-        print(host.id, f)
+        # print(host.id, f)
     return f
 
 def new_repulsive_force(dist_v, rx, ry, height):
@@ -74,17 +75,19 @@ def get_neighbors(host, agents, ra, rx_mat, ry_mat, height_mat):
             neighbors.append(other_agent)
 
     if (Config.CYL_MODEL and Config.TEST_DW_F and Config.ADAPT_H): # Adaptive Height Model Only
-        height_mat = get_adp_height(host, neighbors, agents, height_mat)
+        rx_mat, ry_mat, height_mat = get_adp_height(host, neighbors, agents, rx_mat, ry_mat, height_mat)
     elif (Config.CYL_MODEL and Config.ADAPT_RH): # Adaptive Radius and Height Model
         rx_mat, ry_mat, height_mat = get_adp_radheight(host, neighbors, rx_mat, ry_mat, height_mat)
     elif Config.CYL_MODEL:
         for other_agent in agents:
+            rx_mat[host.id][other_agent.id] = rx_mat[other_agent.id][host.id] = r_alpha
+            ry_mat[host.id][other_agent.id] = ry_mat[other_agent.id][host.id] = r_alpha 
             height_mat[host.id][other_agent.id] = height_mat[other_agent.id][host.id] = Config.h_alpha
 
     return neighbors, rx_mat, ry_mat, height_mat
 
 
-def get_adp_height(host, neighbors, agents, height_mat):
+def get_adp_height(host, neighbors, agents, rx_mat, ry_mat, height_mat):
     dw_neighbor, tau_start, host_z = host, np.inf, np.inf
     r_alpha = Config.r_alpha
     h_min, h_max = Config.h_alpha_min, Config.h_alpha_max
@@ -97,11 +100,11 @@ def get_adp_height(host, neighbors, agents, height_mat):
         vel_v = other_agent.vel_global_frame - vel_i
         dist, distxy = np.linalg.norm(dist_v), np.linalg.norm(dist_v[:2])
 
+        rx_mat[host.id][other_agent.id] = rx_mat[other_agent.id][host.id] = r_alpha
+        ry_mat[host.id][other_agent.id] = ry_mat[other_agent.id][host.id] = r_alpha 
         height_mat[host.id][other_agent.id] = height_mat[other_agent.id][host.id] = h_min
-        if pos_i[2] < Config.z_min or abs(dist_v[2])<h_min:
-            height_mat[host.id][other_agent.id] = height_mat[other_agent.id][host.id] = h_max
+        if abs(dist_v[2]) < h_min:
             continue 
-        # print(host.id)
         sol_exist, tau_start_, tau_end_ = get_tau(dist_v, vel_v)
         if sol_exist and tau_start > tau_start_: # there is only one agent that can cause downwash
             dw_neighbor, tau_start, tau_end = other_agent, tau_start_, tau_end_
@@ -121,20 +124,14 @@ def get_adp_height(host, neighbors, agents, height_mat):
         pos_i_dw = pos_i+tau_end*vel_i
         pos_i_dw[2] = host_z
         agent_k, k_alt = get_victim(host, agents, dw_neighbor, tau_start, tau_end, host_z)
-        # agent_k, k_alt = get_victim(host, neighbors, dw_neighbor, tau_start, tau_end, host_z)
-        # if (((host.goal_global_frame-pos_i)[2]>0 and dw_a < -Config.MaxAcc) or
-        if ((np.linalg.norm(goal_i-pos_i_dw) > (np.linalg.norm(goal_i-pos_i_rep))) or
-            (len(agent_k)!=0 and min(k_alt)>=(pos_j-pos_i)[2])):
-            height_mat[host.id][dw_neighbor.id] = height_mat[dw_neighbor.id][host.id] = h_max
-            # print("here")
-        # print(len(agent_k))
-    return height_mat
+        height_mat[host.id][dw_neighbor.id] = height_mat[dw_neighbor.id][host.id] = (pos_j-pos_i)[2]*max(min(k_alt)/pos_i[2], Config.z_min/pos_i[2], np.linalg.norm(goal_i-pos_i_dw)/np.linalg.norm(goal_i-pos_i_rep))
+
+    return rx_mat, ry_mat, height_mat
+
 
 
 def get_adp_radheight(host, neighbors, rx_mat, ry_mat, height_mat):
     dw_neighbor, tau_start, host_z = host, np.inf, np.inf
-    # r_alpha, h_alpha = Config.r_alpha, Config.h_alpha # default as max
-    # r_min, r_max, h_min, h_max = Config.r_alpha_min, Config.r_alpha_max, Config.h_alpha_min, Config.h_alpha_max
     r_min = [Config.r_alpha_min, Config.r_alpha_min, Config.h_alpha_min]
     r_max = [Config.r_alpha_max, Config.r_alpha_max, Config.h_alpha_max]
     pos_i, goal_i, vel_i = host.pos_global_frame, host.goal_global_frame, host.vel_global_frame
@@ -172,21 +169,13 @@ def get_adp_radheight(host, neighbors, rx_mat, ry_mat, height_mat):
                     host_z += vz*0.01
                     t += 0.01
                 agent_k, k_alt = get_victim(host, neighbors, other_agent, tau_start, tau_end, host_z)
-                if (len(agent_k)!=0 and min(k_alt)>=(pos_j-pos_i)[2]):
+                if (len(agent_k)!=0 and min(k_alt)>=(pos_i)[2]): #(pos_j-pos_i)[2]
                     h_req = min(r_max[2], pos_j[2]-min(k_alt))
-                # elif (np.linalg.norm(goal_i-pos_i_dw) > (np.linalg.norm(goal_i-pos_i_rep)): '''ignore the part with rep force vs dw vs goal'''
-                # dw_a = -25.0*(host.radius**2*np.pi)*9.81/(2*np.pi*(dist_v[2]**2))
-                # pos_i_rep = pos_i + vel_i*tau_end + 0.5*Config.MaxAcc*(tau_end**2)*(dist_v+0.0001)/(abs(dist_v)+0.0001)
-                # pos_i_dw = pos_i+tau_end*vel_i
-                # pos_i_dw[2] = host_z
-
-        # if (h_req == h_max):
-        #     height_mat[host.id][other_agent.id] = height_mat[other_agent.id][host.id] = h_max
 
         # Determine proper radius and height
-        delta_p, vel = dist_v, vel_i
+        delta_p, vel = np.copy(dist_v), np.copy(vel_i)
         while True: # Check if any time in the below process, the UAVs are in the minimum intersection region
-            rep_force = new_repulsive_force(delta_p, dist_v[0], dist_v[1], max(dist_v[2], h_req))
+            rep_force = new_repulsive_force(delta_p, abs(dist_v[0]), abs(dist_v[1]), max(abs(dist_v[2]), h_req))
             vel += rep_force*0.01
             for i in range(3):
                 vel[i] = max(min(vel[i], Config.MaxVelo), -Config.MaxVelo)
@@ -194,73 +183,65 @@ def get_adp_radheight(host, neighbors, rx_mat, ry_mat, height_mat):
             if delta_p[0] <= r_min[0] and delta_p[1] <= r_min[1] and delta_p[2] <= r_min[2]: # If yes, determine the proper range
                 determine_range = True
                 break
-            elif np.linalg.norm(delta_p) > np.linalg.norm(dist_v): # getting further 
+            elif np.linalg.norm(vel_i) < 0.01 or (np.linalg.norm(delta_p) > np.linalg.norm(dist_v)): # getting further 
                 determine_range = False
-                # continue # If no, no repulsive force required
                 break
-        delta_p, vel = dist_v, vel_i
+
+        # print(determine_range)        
+        delta_p, vel = np.copy(dist_v), np.copy(vel_i)
         if determine_range:
-
-
-
-            print('hereeee')
-            
-            
-            ra = t_vss = [0,0,0]
+            ra, t_vss = [0,0,0], [0,0,0]
             for i in range(3):
-                ra[i] = min(a_vss(dist_v[i],vel_i[i]), r_max[i]) # check if >rmin ??
+                ra[i] = max(a_vss(dist_v[i],vel_i[i]), r_min[i]) #min(a_vss(dist_v[i],vel_i[i]), r_max[i]) # check if >rmin ??
                 while True:
-                    # error occur when dist_v [i] == 0
-                    print(Config.MaxAcc*adp_bump_fn(abs(dist_v[i])/ra[i], r_min[i]/ra[i])*abs(dist_v[i])/dist_v[i])
-                    a = -Config.MaxAcc*adp_bump_fn(abs(dist_v[i])/ra[i], r_min[i]/ra[i])*abs(dist_v[i])/dist_v[i]
+                    t_vss[i] += 0.01
+                    if vel[i] == 0.0: break
+                    a = Config.MaxAcc*adp_bump_fn(abs(delta_p[i])/ra[i], r_min[i]/ra[i])*abs(dist_v[i])/dist_v[i]
                     vel[i] = max(min(vel[i]+a*0.01, Config.MaxVelo), -Config.MaxVelo)
                     delta_p[i] += vel[i]*0.01
-                    t_vss[i] += 0.01
-                    if vel[i] * (vel[i]-a*0.01) < 0:
-                        break
+                    if vel[i] * (vel[i]+a*0.01) < 0: break
+                    elif abs(delta_p[i])>ra[i]:      break
             index = t_vss.index(min(t_vss))
             for i in range(3):
                 if i == index: continue
-                a_des = 2*(dist_v[i]-r_min[i]-v_i[i]*t_vss)/t_vss^2
+                if abs(dist_v[i]) < r_min[i]: 
+                    ra[i] = r_min[i]
+                    continue
+                a_des = 2*(dist_v[i]-r_min[i]-vel_i[i]*t_vss[i])/(t_vss[i]**2)
                 if abs(a_des) >= Config.MaxAcc:
                     ra[i] = r_max[i]
                 else:
-                    ra[i] = r_min[i] + np.pi*(dist_v[i]-r_min[i]) / np.arccos(2*abs(a_des)/Config.MaxAcc - 1)
-            
-            # Make sure that ra is within rmin and delta p
+                    ra[i] = r_min[i] + np.pi*(abs(dist_v[i])-r_min[i]) / np.arccos(2*abs(a_des)/Config.MaxAcc - 1)
+                    ra[i] = min(ra[i], r_max[i])
+                    # if ra[i] < 0:
+                    #     print(np.arccos(2*abs(a_des)/Config.MaxAcc - 1), ra[i])
 
             rx_mat[host.id][other_agent.id] = rx_mat[other_agent.id][host.id] = ra[0]
             ry_mat[host.id][other_agent.id] = ry_mat[other_agent.id][host.id] = ra[1]
-            height_mat[host.id][other_agent.id] = height_mat[other_agent.id][host.id] = ra[2]
-        else:
-            height_mat[host.id][other_agent.id] = height_mat[other_agent.id][host.id] = h_req 
+            height_mat[host.id][other_agent.id] = height_mat[other_agent.id][host.id] = max(ra[2], h_req)
+
+        else: height_mat[host.id][other_agent.id] = height_mat[other_agent.id][host.id] = h_req 
 
     return rx_mat, ry_mat, height_mat 
 
 def a_vss(dp, v): #r_min, a_max, 
-    r_min, a_max = Config.r_alpha_min, Config.MaxAcc
+    
+    if v == 0.0: return abs(dp)
+
+    r_min, r_max, a_max = Config.r_alpha_min, Config.r_alpha_max, Config.MaxAcc
     dp = abs(dp)
-    m = GEKKO()
-    ra = m.Var(1)
-    m.Equations([v**2/2 == a_max*((dp-r_min)/(2*ra) + (1-r_min/ra)*m.sin(np.pi*(dp-r_min)/(ra-r_min))/(2*np.pi))])
-    m.solve(disp=False)
 
-    # dp = abs(dp)
-    # ra = sym.Symbol('ra')
-    # eq = a_max*((dp-r_min)/(2*ra) + (1-r_min/ra)*sym.sin(np.pi*(dp-r_min)/(ra-r_min))/(2*np.pi)) - v**2/2
-    # # f = sym.Eq(a_max*((dp-r_min)/(2*ra) + (1-r_min/ra)*sym.sin(np.pi*(dp-r_min)/(ra-r_min))/(2*np.pi)),v**2/2)
-    # ra = sym.solve(f,ra)[0]
-
-    return ra[0]
-# a_vss(0.2, 5, 2, 5)
-
-# def test():
-#     m = GEKKO() #too slow... use matlab to generate equation solution using symbolic??
-#     x = m.Var(1)
-#     m.Equations([0.5==m.sin(x)])
-#     m.solve(disp=False)
-
-#     return x
+    err = np.inf
+    ra = dp + 0.01
+    while ra < r_max:
+        e = abs(v**2/2 - a_max*((dp-r_min)/(2*ra) + (1-r_min/ra)*np.sin(np.pi*(dp-r_min)/(ra-r_min))/(2*np.pi)))
+        if err > e:
+            err = e
+            ra += 0.01
+        else:
+            # print(ra)
+            return ra
+    return r_max
 
 
 def get_tau(dist_v, vel_v):
@@ -322,6 +303,8 @@ def get_victim(host, agents, dw_neighbor, tau_start, tau_end, host_z):
 
                 agent_k.append(other_agent)
                 k_alt.append(min(l_0[2], l_1[2]))
+
+    if len(k_alt) == 0: k_alt.append(-1)
 
     return agent_k, k_alt
 
