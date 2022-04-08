@@ -51,10 +51,10 @@ class Config:
     # CYL_MODEL = False   
     '''Adaptive height'''
     ADAPT_H = True
-    ADAPT_H = False
+    # ADAPT_H = False
     '''Adaptive model (height+radius)'''
     ADAPT_RH = True
-    # ADAPT_RH = False
+    ADAPT_RH = False
 
     '''Plot drones? for plots_3D.py'''
     PLOT_DRONE = True
