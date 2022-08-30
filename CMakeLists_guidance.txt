@@ -1,0 +1,59 @@
+cmake_minimum_required(VERSION 3.0.0...3.5.0) # 第一行声明所需 cmake 版本
+# cmake 版本下限应设为 3.0.0 以上，上限可缺省
+project(an_example_project)
+
+# REQUIRED 声明此库是必需的，如果 cmake 找不到此库就会报错并退出
+find_package(Eigen3 REQUIRED)
+
+# 库名后加数字声明所需项目版本
+find_package(OpenCV 4.0 REQUIRED)
+
+# 在 COMPONENTS 后列出所需的库（以boost为例）组件
+find_package(Boost REQUIRED COMPONENTS system program_options)
+
+find_package(GTest)
+
+# CMakeLists中 的条件语法为 if(条件...) 执行命令 ... else() 执行命令 ... endif()
+
+# GTEST_FOUND 为 GTest 方定义的 Cmake 变量，以 ${变量名...} 读取变量值（此处为找到 GTest 包或否）
+if(${GTEST_FOUND})
+  # 使用 set(变量名 变量值) 语法定义变量
+  set(GTest_TARGET_LIST "GTest::gmock;GTest::gtest;GTest::gmock_main;
+                        GTest::gtest_main")
+
+endif()
+
+# 使用 message 语句打印消息
+message("Dependency versions: Boost " ${Boost_VERSION} " OpenCV "
+        ${OpenCV_VERSION})
+
+# include_directories 后列出的文件夹中的头文件能被本项目里所有代码通过 #include 找到
+include_directories(include)
+
+# 声明本项目创建的函数库，暂命名为 cv_utils
+add_library(cv_utils src/an_example_project/cv_utils.cpp)
+# 声明 cv_utils 库所依赖的头文件；如果本项目中仅有 cv_utils 库依赖 OpenCV，应该使用
+# target_include_directories，使得只有 cv_utils.cpp 能搜索到 OpenCV 头文件
+target_include_directories(cv_utils PRIVATE ${OpenCV_INCLUDE_DIRES})
+# 声明 cv_utils 库所依赖的 C++ 标准
+target_compile_features(cv_utils PRIVATE cxx_std_17)
+# 声明 cv_utils 的编译选项，例如 -O3 优化选项，-Wall -Wextra -Wpedantic 增加编译器警告
+target_compile_options(cv_utils PRIVATE -o3)
+# 声明 cv_utils 库所依赖的链接库
+target_link_libraries(cv_utils PRIVATE ${OpenCV_LIBS})
+
+# 声明另一个本项目创建的函数库 quick_maths
+add_library(quick_maths src/an_example_project/quick_maths.cpp)
+# 声明 quick_maths.cpp 所需的宏定义
+target_compile_definitions(quick_maths PRIVATE "EIGEN_DEFAULT_TO_ROW_MAJOR=0")
+# 新式 cmake 语法以一个“目标“（target）概括库所提供的所有头文件和链接库，在 target_link_libraries 里使用 库名::目标名
+# 语法引入此目标
+target_link_libraries(quick_maths PRIVATE Eigen3::Eigen)
+
+# 声明本项目创建的可执行文件
+add_executable(project_main src/example_project_entrypoint.cpp)
+target_include_directories(project_main PRIVATE ${Boost_INCLUDE_DIRS})
+# project_main 有依赖本项目中先前创建的 quick_maths 和 cv_utils 库，所以将其加入
+# target_link_libraries 之中
+target_link_libraries(project_main PRIVATE quick_maths cv_utils
+                                           ${Boost_LIBRARIES})

@@ -87,7 +87,8 @@ int main(int argc, char **argv)
         case 1:
             if(current_state.mode != "OFFBOARD")
             {
-                mode_cmd.request.custom_mode = "OFFBOARD";
+                // mode_cmd.request.custom_mode = "OFFBOARD";
+                mode_cmd.request.custom_mode = "GUIDED";
                 set_mode_client.call(mode_cmd);
                 cout << "Setting to OFFBOARD Mode..." <<endl;
 
@@ -102,7 +103,7 @@ int main(int argc, char **argv)
         case 2:
             if(current_state.mode != "STABILIZED")
             {
-                mode_cmd.request.custom_mode = "STABILIZED";
+                mode_cmd.request.custom_mode = "STABILIZE";
                 set_mode_client.call(mode_cmd);
                 cout << "Setting to STABILIZED Mode..." <<endl;
 
@@ -117,7 +118,8 @@ int main(int argc, char **argv)
         case 3:
             if(current_state.mode != "POSCTL")
             {
-                mode_cmd.request.custom_mode = "POSCTL";
+                // mode_cmd.request.custom_mode = "POSCTL";
+                mode_cmd.request.custom_mode = "POSITION";
                 set_mode_client.call(mode_cmd);
                 cout << "Setting to POSCTL Mode..." <<endl;
 
@@ -132,7 +134,8 @@ int main(int argc, char **argv)
         case 4:
             if(current_state.mode != "ALTCTL")
             {
-                mode_cmd.request.custom_mode = "ALTCTL";
+                // mode_cmd.request.custom_mode = "ALTCTL";
+                mode_cmd.request.custom_mode = "ALT_HOLD";
                 set_mode_client.call(mode_cmd);
                 cout << "Setting to ALTCTL Mode..." <<endl;
 
