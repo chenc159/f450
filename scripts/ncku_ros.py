@@ -33,16 +33,16 @@ class test(object):
         self.gps_velo[0] = msg.twist.twist.linear.x
         self.gps_velo[1] = msg.twist.twist.linear.y
         self.gps_velo[2] = msg.twist.twist.linear.z
-        print('gpsL: ', self.gps_pose, self.gps_velo)
+        # print('gpsL: ', self.gps_pose, self.gps_velo)
     def gpsG_callback(self, msg):
         self.gpsG_msg = msg
         lat, lon, alt = msg.latitude, msg.longitude, msg.altitude
-        print('LLA: ', lat, lon, alt)
+        # print('LLA: ', lat, lon, alt)
     def bat_callback(self, msg):
         self.bat_msg = msg
         volt = msg.voltage
         volt_perc = msg.percentage
-        print('volt: ', volt)
+        # print('volt: ', volt)
     def imu_callback(self, msg):
         self.imu_msg = msg
         self.quat[0] = msg.orientation.w
@@ -50,7 +50,7 @@ class test(object):
         self.quat[2] = msg.orientation.y
         self.quat[3] = msg.orientation.z
         self.roll, self.pitch, self.yaw = self.euler_from_quaternion(msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
-        print(self.roll, self.pitch, self.yaw)
+        # print(self.roll, self.pitch, self.yaw)
 
     def euler_from_quaternion(self, x, y, z, w):
         """
